@@ -1,0 +1,210 @@
+#!/bin/bash
+# Guide to use this Script
+# After Boot up with Gentoo Live CD 
+# Create your Partation (Boot Swat and Root)
+# live cd ~ # nano filename.sh
+# copy and paste the Part I code to that file
+# live cd ~ # chmod +x filename.sh
+# live cd ~ # ./filename.sh
+
+#Part I start from here
+[[ ${RC_GOT_FUNCTIONS} != "yes" ]]
+[[ -f /sbin/livecd-functions.sh ]] && \
+        source /sbin/livecd-functions.sh && \
+        livecd_read_commandline
+
+function askhdd(){
+printf -v f "%"$(tput cols)"s" ; printf "%s\n" "${f// /*}"
+echo "Please enter you partation table manually"
+echo "Type your boot partation number [1 or 2 or 3]"
+read hddno1
+hdd1="$hdtype$hddno1"
+echo "Type your swap partation number [1 or 2 or 3]"
+read hddno2
+hdd2="$hdtype$hddno2"
+echo "Type your root partation number [1 or 2 or 3]"
+read hddno3
+hdd3="$hdtype$hddno3"
+}
+
+function manualhdd(){
+echo "Setup cannot detect your partation table automatically"
+echo "Your Partation table is"
+fdisk -l | grep -w /dev
+while true; do
+    read -p "Do you want to Create or Modify the Partation table? [y/n]" yn
+    case $yn in
+        [Yy]* )  hdtype=$(fdisk -l | grep da: | awk '{print$2}' | cut -c6-8);
+                    fdisk /dev/$hdtype;
+                    autohdd;
+                    break;;
+        [Nn]* ) hdtype=$(fdisk -l | grep da: | awk '{print$2}' | cut -c6-8);
+                    askhdd;
+                    break;;
+        * ) echo "Please answer yes or no.";;
+    esac
+done
+}
+function autohdd(){
+ebegin "Auto Detecting partation table"
+thdd1=$(fdisk -l | grep -w /dev | grep -v Disk | awk '{print$1}' | cut -c6-9 | grep a1)
+thdd1size=$( fdisk -l | grep -w /dev | grep a1 |grep -v Disk | awk '{print$4}')
+thdd1type=$(fdisk -l | grep -w /dev | grep a1 |grep -v Disk | awk '{print$5}')
+thdd2=$(fdisk -l | grep -w /dev | grep -v Disk | awk '{print$1}' | cut -c6-9 | grep a2)
+thdd2size=$( fdisk -l | grep -w /dev | grep a2 |grep -v Disk | awk '{print$4}')
+thdd2type=$(fdisk -l | grep -w /dev | grep a2 |grep -v Disk | awk '{print$5}')
+thdd3=$(fdisk -l | grep -w /dev | grep -v Disk | awk '{print$1}' | cut -c6-9 | grep a3)
+thdd3size=$( fdisk -l | grep -w /dev | grep a3 |grep -v Disk | awk '{print$4}')
+thdd3type=$(fdisk -l | grep -w /dev | grep a3 |grep -v Disk | awk '{print$5}')
+if [ -z $thdd1 ] || [ -z $thdd2 ] || [ -z $thdd3 ]; then
+eend 1
+manualhdd
+elif [ $thdd1type == 82 ]; then
+ hdd2=$thdd1
+  if [ $thdd2size -gt $thdd3size ]; then
+  hdd3=$thdd2
+  hdd1=$thdd3
+eend $?
+  elif [ $thdd3size -gt $thdd2size ]; then
+  hdd3=$thdd3
+  hdd1=$thdd2
+eend $?
+  else
+  manualhdd
+  fi
+
+elif [  $thdd2type == 82 ]; then
+hdd2=$thdd2
+  if [ $thdd1size -gt $thdd3size ]; then
+hdd3=$thdd1
+hdd1=$thdd3
+eend $?
+  elif [ $thdd3size -gt $thdd1size ]; then
+hdd3=$thdd3
+hdd1=$thdd1
+eend $?
+  else
+  manualhdd
+ fi
+elif [ $thdd3type == 82 ]; then
+hdd2=$thdd3
+  if [ $thdd1size -gt $thdd2size ]; then
+hdd3=$thdd1
+hdd1=$thdd2
+eend $?
+
+  elif [ $thdd2size -gt $thdd1size ]; then
+hdd3=$thdd2
+hdd1=$thdd1
+eend $?
+  else
+  manualhdd
+  fi
+else
+eend 1
+echo "There is no Swap Partation in partation table"
+manualhdd
+fi
+}
+
+echo "welcome to gentoo installation script"
+echo "If you need to cancel installagion press Ctrl+C"
+while true; do
+printf -v f "%"$(tput cols)"s" ; printf "%s\n" "${f// /*}"
+autohdd
+echo "Current Date and Time is `date`".
+while true; do
+    read -p "Do you want to modify Date and Time?[y/n]" yn
+    case $yn in
+        [Yy]* ) echo "Type Date and Time (Format is MMDDhhmmYYYY)";
+                read date1;
+                date $date1;
+  			eend $?
+                echo "Your Date is now `date`".;
+                break;;
+        [Nn]* ) break;;
+        * ) echo "Please answer y/n";;
+    esac
+done
+echo "Default Stage3 download link is http://distfiles.gentoo.org/releases/x86/current-stage3/stage3-i686-20130528.tar.bz2"
+while true; do
+    read -p "Do you want to modify the link?[y/n]" yn
+    case $yn in
+        [Yy]* ) echo "Copy and paste stage3 link (including file name: stage3*.tar.bz2)";
+                read link1;
+                break;;
+        [Nn]* ) link1=$"http://distfiles.gentoo.org/releases/x86/current-stage3/stage3-i686-20130528.tar.bz2";
+                break;;
+        * ) echo "Please answer y/n";;
+    esac
+done
+printf -v f "%"$(tput cols)"s" ; printf "%s\n" "${f// /*}"
+echo
+echo "Your are using -"
+echo "- $hdd1 as boot device"
+echo "- $hdd2 as swap device"
+echo "- $hdd3 as root device"
+echo 
+echo "Stage 3 download link is $link1"
+printf -v f "%"$(tput cols)"s" ; printf "%s\n" "${f// /*}"
+echo
+    read -p "Is the above configurations are correct?[y/n]" yn
+    case $yn in
+        [Yy]* ) break;;
+        [Nn]* ) ;;
+        * ) echo "Please answer y/n";;
+    esac
+done
+ebegin "Formating Boot partation"
+mke2fs /dev/$hdd1
+eend $?
+ebegin "Formating Root partation"
+mke2fs -j /dev/$hdd3 
+eend $?
+ebegin "Formating Swap partation"
+mkswap /dev/$hdd2
+eend $?
+ebegin "Swap On"
+swapon /dev/$hdd2
+eend $?
+ebegin "Mounting Root Partation"
+mount /dev/$hdd3 /mnt/gentoo
+eend $?
+ebegin "Creating Boot Directory"
+mkdir /mnt/gentoo/boot
+eend $?
+ebegin "Mounting Boot Partation"
+mount /dev/$hdd1 /mnt/gentoo/boot
+eend $?
+ebegin "Copy Part2"
+cp part2.sh /mnt/gentoo/
+eend $?
+ebegin "Chmod"
+chmod +x /mnt/gentoo/part2.sh
+eend $?
+ebegin "Change Folder"
+cd /mnt/gentoo
+eend $?
+ebegin "Downloading Stage3 file"
+wget -O stage3.tar.bz2 $link1
+eend $?
+ebegin "Extracting Stage3 file"
+tar xjpf stage3.tar.bz2
+eend $?
+ebegin "Change folder"
+cd /
+eend $?
+ebegin "Mounting Proc"
+mount -t proc proc /mnt/gentoo/proc
+eend $?
+ebegin "Mounting dev"
+mount --rbind /dev /mnt/gentoo/dev
+eend $?
+ebegin "Copying Resolv.conf"
+cp -L /etc/resolv.conf /mnt/gentoo/etc/
+eend $?
+ebegin "Mounting Proc"
+chroot /mnt/gentoo /bin/bash -c "./part2.sh"
+
+
+# End of Part I
